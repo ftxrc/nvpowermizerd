@@ -16,6 +16,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <X11/extensions/scrnsaver.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+
 #include <argp.h>
 #include <signal.h>
 #include <stdio.h>
@@ -82,16 +86,16 @@ static int verbose = 0;
    printf(__VA_ARGS__);
 
 // Global variables for X access
+static XScreenSaverInfo *SSInfo;
+static Display *display;
+static int screen;
 
 // Returns the idle time in milliseconds as reported by X
-int
+inline time_t
 GetIdleTimeMS()
 {
-   int ms;
-   FILE *fp = popen("/usr/bin/xprintidle", "r");
-   fscanf(fp, "%d", &ms);
-   pclose(fp);
-   return ms;
+   XScreenSaverQueryInfo(display, RootWindow(display,screen), SSInfo);
+   return SSInfo->idle;
 }
 
 void
@@ -127,6 +131,8 @@ Cleanup()
 {
    free(lowPowerCmd);
    free(highPowerCmd);
+   XFree(SSInfo);
+   XCloseDisplay(display);
 }
 
 void
@@ -176,6 +182,12 @@ Init()
    sigaction(SIGINT, &action, NULL);
 
    // Initialize X state
+   SSInfo = XScreenSaverAllocInfo();
+   if ((display = XOpenDisplay(NULL)) == NULL) {
+      LOG("Couldn't open X display!\n");
+      exit(1);
+   }
+   screen = DefaultScreen(display);
 }
 
 int
